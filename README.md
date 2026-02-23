@@ -74,7 +74,51 @@ bash scripts/batch_transcribe.sh \
 | `.vtt` | Web字幕 |
 | `.json` | 詳細データ（segments・timestamps 等）|
 
+## 品質向上
+
+### 2つの品質レイヤー
+
+Whisperパイプラインの品質は2つのレイヤーで構成される:
+
+| Layer | 処理 | 品質の鍵 |
+|-------|------|---------|
+| **Layer 1: 文字起こし** | 音声→テキスト | vocabulary, initial_prompt, post-processing |
+| **Layer 2: ドキュメント生成** | テキスト→議事録等 | ゴールドスタンダード, コンテキスト, 品質基準 |
+
+Layer 2の品質問題はLayer 1の再実行では解決しない。詳細: CONTEXT.md `LESSONS_LEARNED`
+
+### Layer 1: 文字起こし品質
+
+#### vocabulary連携
+- アプリ汎用: `vocabularies/general_vocabulary.txt`
+- プロジェクト固有: 各プロジェクトの `whisper/vocabularies/{project}_vocabulary.txt`
+
+#### 推奨ワークフロー
+1. 事前アジェンダがあれば、initial_promptに追加
+2. vocabulary付きで文字起こし実行
+3. post-processing（固有名詞修正スクリプト）で精度向上
+
+#### 将来: 2-pass transcription
+1回目のDraftをcontextとして2回目に渡し、認識精度をさらに向上させる計画。
+詳細: AGENTS.md `QUALITY_IMPROVEMENT_STRATEGIES`
+
+### Layer 2: ドキュメント生成品質
+
+#### ゴールドスタンダードアプローチ
+1. プロジェクトのAGENTS.mdに品質基準を定義（golden_rules, quality_checklist, anti_patterns）
+2. 最も品質の高い既存ドキュメントをゴールドスタンダードとして指定
+3. 生成時にtranscript + チーム情報 + 事前経緯 + 品質基準を渡す
+4. 生成後にチェックリストで検証
+
+#### バッチ再生成
+既存のtranscriptから品質基準付きで一括再生成が可能:
+- 品質基準を事後的に改善したとき
+- バッチ生成で品質が不足したとき
+- 並列サブエージェントでスケーラブルに処理
+
+詳細: AGENTS.md `DOCUMENT_GENERATION_FRAMEWORK`
+
 ---
 
-*whisper README.md v1.0.0*
+*whisper README.md v1.1.0*
 *CARE-Pattern: R (README) layer*
