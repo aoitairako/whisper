@@ -2,7 +2,7 @@
 
 > path: ~/Applications/whisper/
 > role: whisper_transcription_mcp_server
-> version: v1.1.0
+> version: v2.0.0
 > CARE-Pattern: A (Agents / Machine interface) layer
 
 ## WHISPER_IDENTITY
@@ -10,13 +10,59 @@
 ```python
 WHISPER_MCP = {
     'role': 'whisper_transcription_mcp_server',
-    'version': 'v1.1.0',
-    'updated': '2026-02-23',
+    'version': 'v2.0.0',
+    'updated': '2026-02-24',
     'api': 'OpenAI Whisper API',
     'model': 'whisper-1',
     'transport': 'stdio (FastMCP)',
     'auth': 'OPENAI_API_KEY env',
     'default_language': 'ja'
+}
+```
+
+## ARCHITECTURE
+
+```python
+# v2.0.0: Plugin Architecture — lib/ as Single Source of Truth
+ARCHITECTURE = {
+    'lib/': {
+        'role': 'Core library — all business logic lives here',
+        'modules': {
+            'core.py': 'transcribe, batch, process_voice_memos',
+            'formats.py': 'SRT/VTT output formatting',
+            'vocabulary.py': 'Vocabulary file management (*.txt)',
+            'dictionary.py': 'Post-processing dictionary (*.dict.json)',
+            '__init__.py': 'Public exports',
+        },
+        'design': {
+            'extra_vocab_dirs': 'Callers can pass additional vocab directories',
+            'WHISPER_VOCAB_DIR': 'Env override for Docker deployments',
+            'no_the_i_deps': 'lib/ has ZERO dependencies on The I',
+        }
+    },
+    'server.py': {
+        'role': 'Standalone MCP server (FastMCP)',
+        'imports': 'from lib import ...',
+        'tools': 8,
+    },
+    'whisper_api.py': {
+        'role': 'Backward-compat shim (WhisperClient class)',
+        'delegates_to': 'lib/',
+    },
+    'vocabularies/': {
+        'role': 'Single Source of Truth for all vocabulary + dictionary files',
+        'files': [
+            'general_vocabulary.txt',
+            'family_vocabulary.txt',
+            'family.dict.json',
+        ],
+    },
+    'the_i_integration': {
+        'adapter': 'the_i/tools/whisper_mcp/mcp/adapter.py',
+        'strategy': 'Try import lib/ → fallback to inline',
+        'env': 'WHISPER_APP_PATH for Docker path override',
+        'extra_vocab_dirs': 'Passes The I vocab dir for additional dictionaries',
+    },
 }
 ```
 
@@ -26,28 +72,30 @@ WHISPER_MCP = {
 MCP_TOOLS = {
 
     'whisper_status': {
-        'description': 'Whisper MCP server の状態確認（API key 有効性含む）',
+        'description': 'Whisper MCP server の状態確認（API key 有効性、語彙・辞書一覧）',
         'params': {},
         'returns': {
+            'status': str,
             'api_key_configured': bool,
-            'vocabularies_available': list,
-            'server_version': str
+            'vocabularies': list,
+            'version': str
         }
     },
 
     'whisper_transcribe': {
-        'description': '音声ファイルを文字起こし',
+        'description': '音声ファイルを文字起こし（後処理辞書による自動修正付き）',
         'params': {
             'audio_path': 'str — 音声ファイルの絶対パス (.m4a, .mp4, .mp3, .wav 等)',
-            'output_dir': 'str | None — 出力先ディレクトリ (default: audio_path の transcripts/)',
-            'vocabulary_path': 'str | None — 語彙辞書ファイルパス',
+            'output_dir': 'str — 出力先ディレクトリ (default: audio_path の transcripts/)',
+            'vocabulary_path': 'str — 語彙ファイルパス',
+            'vocabulary_prompt': 'str — 直接指定のプロンプト文字列（vocabulary_path より優先）',
             'language': 'str — 言語コード (default: "ja")',
-            'output_formats': 'list — ["txt", "srt", "vtt", "json"] のサブセット'
+            'output_formats': 'str — カンマ区切り: "txt,srt,vtt,json"'
         },
         'returns': {
-            'success': bool,
+            'status': str,
             'output_files': 'dict — {format: file_path}',
-            'duration_seconds': float
+            'text_preview': str
         }
     },
 
@@ -55,14 +103,25 @@ MCP_TOOLS = {
         'description': 'ディレクトリ内の未処理会議を一括文字起こし (transcripts/ がないもの)',
         'params': {
             'meetings_base_dir': 'str — 会議ディレクトリのベースパス',
-            'vocabulary_path': 'str | None — 語彙辞書ファイルパス'
+            'vocabulary_path': 'str — 語彙ファイルパス'
         },
         'returns': {
+            'status': str,
             'total': int,
             'processed': int,
-            'skipped': int,
             'failed': int,
             'results': list
+        }
+    },
+
+    'whisper_process_voice_memos': {
+        'description': 'Meetings ディレクトリのボイスメモを自動スキャン＆文字起こし',
+        'params': {},
+        'returns': {
+            'status': str,
+            'total': int,
+            'processed': int,
+            'meetings_dir': str
         }
     },
 
@@ -70,21 +129,46 @@ MCP_TOOLS = {
         'description': '利用可能な語彙ファイル一覧',
         'params': {},
         'returns': {
-            'app_vocabularies': 'list — ~/Applications/whisper/vocabularies/ 内',
-            'found_in_cwd': 'list — カレントディレクトリの whisper/vocabularies/'
+            'status': str,
+            'vocabularies': list,
+            'vocab_dirs': list
         }
     },
 
     'whisper_vocabulary_add': {
-        'description': '語彙ファイルにエントリを追加',
+        'description': '語彙ファイルにエントリを追加（重複自動スキップ）',
         'params': {
             'vocab_file': 'str — 語彙ファイルのパス',
             'terms': 'list[str] — 追加する語彙リスト'
         },
         'returns': {
+            'status': str,
             'added': int,
             'skipped': int,
-            'total_lines': int
+            'total_terms': int
+        }
+    },
+
+    'whisper_dictionary_list': {
+        'description': '後処理置換辞書 (*.dict.json) の一覧',
+        'params': {},
+        'returns': {
+            'status': str,
+            'dictionaries': list,
+            'total_entries': int
+        }
+    },
+
+    'whisper_dictionary_add': {
+        'description': '後処理辞書にエントリを追加（重複自動スキップ）',
+        'params': {
+            'dict_file': 'str — *.dict.json ファイルのパス',
+            'entries': 'list[dict] — [{"from": "...", "to": "..."}]'
+        },
+        'returns': {
+            'status': str,
+            'added': int,
+            'total_entries': int
         }
     }
 }
@@ -96,17 +180,22 @@ MCP_TOOLS = {
 VOCABULARY = {
     'format': '1行1語彙（#コメント行可）',
     'prompt_usage': 'Whisper API の prompt パラメータに渡す（カンマ区切りテキスト）',
-    'app_vocabularies': {
-        'general': '~/Applications/whisper/vocabularies/general_vocabulary.txt'
+    'location': '~/Applications/whisper/vocabularies/ (Single Source of Truth)',
+    'files': {
+        'general': 'general_vocabulary.txt — 汎用業務語彙',
+        'family': 'family_vocabulary.txt — 家族名・固有名詞',
+        'family_dict': 'family.dict.json — 後処理置換辞書',
     },
     'project_vocabularies': {
         'pattern': '{project}/whisper/vocabularies/{project}_vocabulary.txt',
         'uranairo': '~/Documents/uranairo/whisper/vocabularies/uranairo_vocabulary.txt'
     },
+    'env_override': 'WHISPER_VOCAB_DIR — Docker 環境でのパスオーバーライド',
     'how_to_use': [
-        'vocabulary_path に辞書ファイルを指定',
+        'vocabulary_path に語彙ファイルを指定',
         '辞書内容が Whisper の prompt に渡され固有名詞認識が向上',
-        'プロジェクト固有辞書 + general 辞書を組み合わせ可能'
+        '*.dict.json は文字起こし後に自動適用（後処理辞書）',
+        'プロジェクト固有語彙 + general 語彙を組み合わせ可能'
     ]
 }
 ```
@@ -132,7 +221,7 @@ OUTPUT = {
 QUALITY_STRATEGIES = {
     'vocabulary_prompt': {
         'description': 'プロジェクト固有語彙をpromptパラメータに渡し、認識精度を向上',
-        'implementation': 'whisper_api.py _load_vocabulary() → comma-separated → prompt kwarg',
+        'implementation': 'lib/vocabulary.py load_vocabulary() → comma-separated → prompt kwarg',
         'limit': '200 tokens (200行上限)',
         'status': 'implemented',
     },
@@ -256,5 +345,5 @@ BATCH_REGENERATION_PATTERN = {
 
 ---
 
-*whisper AGENTS.md v1.1.0*
+*whisper AGENTS.md v2.0.0*
 *CARE-Pattern: Agents (Machine interface) layer*

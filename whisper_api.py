@@ -1,37 +1,37 @@
 #!/usr/bin/env python3
 """
-Whisper API Client
-OpenAI Whisper API wrapper with vocabulary support and multi-format output.
+Whisper API Client — Backward-compatibility shim.
+Delegates to lib/ for all functionality.
+
+Legacy interface preserved for existing callers.
+New code should import from lib/ directly.
 """
 
-import json
-import os
+import sys
 from pathlib import Path
 from typing import Optional
 
-import openai
+# Ensure lib/ is importable
+_app_dir = Path(__file__).resolve().parent
+if str(_app_dir) not in sys.path:
+    sys.path.insert(0, str(_app_dir))
+
+from lib.core import transcribe as lib_transcribe
+from lib.formats import to_srt, to_vtt
+from lib.vocabulary import load_vocabulary
 
 
 class WhisperClient:
-    """OpenAI Whisper API client with vocabulary and multi-format output."""
+    """OpenAI Whisper API client — backward-compat wrapper around lib/."""
 
     def __init__(self, api_key: Optional[str] = None):
+        import os
         self.api_key = api_key or os.environ.get("OPENAI_API_KEY", "")
         if not self.api_key:
             raise ValueError("OPENAI_API_KEY env var not set")
-        self.client = openai.OpenAI(api_key=self.api_key)
 
     def _load_vocabulary(self, vocab_path: str) -> str:
-        """Load vocabulary file and return as comma-separated prompt string."""
-        p = Path(vocab_path).expanduser()
-        if not p.exists():
-            return ""
-        terms = []
-        for line in p.read_text(encoding="utf-8").splitlines():
-            line = line.strip()
-            if line and not line.startswith("#"):
-                terms.append(line)
-        return ", ".join(terms[:200])  # Whisper prompt limit ~200 tokens
+        return load_vocabulary(vocab_path)
 
     def transcribe(
         self,
@@ -41,117 +41,36 @@ class WhisperClient:
         language: str = "ja",
         output_formats: Optional[list] = None,
     ) -> dict:
-        """
-        Transcribe audio file using Whisper API.
-
-        Returns dict with output file paths and metadata.
-        """
-        audio_path = Path(audio_path).expanduser()
-        if not audio_path.exists():
-            return {"success": False, "error": f"File not found: {audio_path}"}
-
-        # Determine output directory
-        if output_dir:
-            out_dir = Path(output_dir).expanduser()
-        else:
-            out_dir = audio_path.parent / "transcripts"
-        out_dir.mkdir(parents=True, exist_ok=True)
-
-        # Load vocabulary as prompt
-        prompt = ""
-        if vocabulary_path:
-            prompt = self._load_vocabulary(vocabulary_path)
-
         if output_formats is None:
             output_formats = ["txt", "srt", "vtt", "json"]
 
-        output_files = {}
-        stem = audio_path.stem
+        result = lib_transcribe(
+            audio_path=str(audio_path),
+            output_dir=output_dir or "",
+            vocabulary_path=vocabulary_path or "",
+            language=language,
+            output_formats=",".join(output_formats),
+        )
 
-        # Transcribe with text format first (plain text)
-        with open(audio_path, "rb") as f:
-            kwargs = {
-                "model": "whisper-1",
-                "file": f,
-                "language": language,
-                "response_format": "verbose_json",
-            }
-            if prompt:
-                kwargs["prompt"] = prompt
+        # Translate status key for backward compat
+        if "status" in result:
+            result["success"] = result["status"] == "success"
 
-            result = self.client.audio.transcriptions.create(**kwargs)
-
-        # Save each requested format
-        if "txt" in output_formats:
-            txt_path = out_dir / f"{stem}.txt"
-            txt_path.write_text(result.text, encoding="utf-8")
-            output_files["txt"] = str(txt_path)
-
-        if "json" in output_formats:
-            json_path = out_dir / f"{stem}.json"
-            json_path.write_text(
-                json.dumps(result.model_dump(), ensure_ascii=False, indent=2),
-                encoding="utf-8",
-            )
-            output_files["json"] = str(json_path)
-
-        if "srt" in output_formats or "vtt" in output_formats:
-            segments = getattr(result, "segments", [])
-            if "srt" in output_formats:
-                srt_path = out_dir / f"{stem}.srt"
-                srt_path.write_text(
-                    self._to_srt(segments), encoding="utf-8"
-                )
-                output_files["srt"] = str(srt_path)
-
-            if "vtt" in output_formats:
-                vtt_path = out_dir / f"{stem}.vtt"
-                vtt_path.write_text(
-                    self._to_vtt(segments), encoding="utf-8"
-                )
-                output_files["vtt"] = str(vtt_path)
-
-        return {
-            "success": True,
-            "audio_file": str(audio_path),
-            "output_dir": str(out_dir),
-            "output_files": output_files,
-            "language": language,
-            "vocabulary_used": bool(prompt),
-            "text_preview": result.text[:200] + "..." if len(result.text) > 200 else result.text,
-        }
+        return result
 
     def _seconds_to_srt_time(self, seconds: float) -> str:
-        h = int(seconds // 3600)
-        m = int((seconds % 3600) // 60)
-        s = int(seconds % 60)
-        ms = int((seconds % 1) * 1000)
-        return f"{h:02d}:{m:02d}:{s:02d},{ms:03d}"
+        from lib.formats import seconds_to_srt_time
+        return seconds_to_srt_time(seconds)
 
     def _seconds_to_vtt_time(self, seconds: float) -> str:
-        h = int(seconds // 3600)
-        m = int((seconds % 3600) // 60)
-        s = int(seconds % 60)
-        ms = int((seconds % 1) * 1000)
-        return f"{h:02d}:{m:02d}:{s:02d}.{ms:03d}"
+        from lib.formats import seconds_to_vtt_time
+        return seconds_to_vtt_time(seconds)
 
     def _to_srt(self, segments: list) -> str:
-        lines = []
-        for i, seg in enumerate(segments, 1):
-            start = self._seconds_to_srt_time(seg.get("start", 0))
-            end = self._seconds_to_srt_time(seg.get("end", 0))
-            text = seg.get("text", "").strip()
-            lines.append(f"{i}\n{start} --> {end}\n{text}\n")
-        return "\n".join(lines)
+        return to_srt(segments)
 
     def _to_vtt(self, segments: list) -> str:
-        lines = ["WEBVTT\n"]
-        for i, seg in enumerate(segments, 1):
-            start = self._seconds_to_vtt_time(seg.get("start", 0))
-            end = self._seconds_to_vtt_time(seg.get("end", 0))
-            text = seg.get("text", "").strip()
-            lines.append(f"{i}\n{start} --> {end}\n{text}\n")
-        return "\n".join(lines)
+        return to_vtt(segments)
 
     def get_unprocessed_meetings(self, meetings_base_dir: str) -> list:
         """Find meeting directories without transcripts/ subdirectory."""
@@ -160,7 +79,6 @@ class WhisperClient:
             return []
 
         unprocessed = []
-        # Pattern: YYYYMM/YYYYMMDD_meeting/
         for month_dir in sorted(base.iterdir()):
             if not month_dir.is_dir():
                 continue
@@ -170,7 +88,6 @@ class WhisperClient:
                 transcripts = meeting_dir / "transcripts"
                 has_transcripts = transcripts.exists() and any(transcripts.glob("*.txt"))
                 if not has_transcripts:
-                    # Check for audio files
                     audio_files = list(meeting_dir.rglob("*.m4a")) + list(meeting_dir.rglob("*.mp4"))
                     if audio_files:
                         unprocessed.append({
