@@ -108,6 +108,7 @@ foundation:
   path: "~/context/"
   domain: "thecontextfoundation.org"
   relationship: "Audio to text — turning spoken Content into searchable Context"
+  synced: "v5.0.0"
 ```
 
 ---
