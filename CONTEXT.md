@@ -100,5 +100,17 @@ Layer 2（バッチ生成の議事録品質）が不足していた。解決策�
 
 ---
 
-*whisper CONTEXT.md v1.1.0*
-*CARE-Pattern: Context layer*
+## FOUNDATION
+
+```yaml
+foundation:
+  project: "The Context Foundation"
+  path: "~/context/"
+  domain: "thecontextfoundation.org"
+  relationship: "Audio to text — turning spoken Content into searchable Context"
+```
+
+---
+
+*whisper CONTEXT.md v1.2.0*
+*The Context Foundation: ~/context/CONTEXT.md v5.0.0*
