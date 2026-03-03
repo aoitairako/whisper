@@ -34,6 +34,7 @@ from lib import (
     dictionary_list as lib_dictionary_list,
     dictionary_add as lib_dictionary_add,
     get_vocab_dirs,
+    get_local_status,
 )
 
 mcp = FastMCP("whisper")
@@ -43,9 +44,10 @@ _APP_VOCAB_DIR = _app_dir / "vocabularies"
 
 @mcp.tool()
 async def whisper_status() -> dict:
-    """Whisper MCP server の状態確認（OpenAI API key 有効性含む）"""
+    """Whisper MCP server の状態確認（バックエンド・API key・語彙一覧）"""
     api_key = os.environ.get("OPENAI_API_KEY", "")
     configured = bool(api_key)
+    local = get_local_status()
 
     vocabs = []
     for vdir in get_vocab_dirs():
@@ -58,13 +60,22 @@ async def whisper_status() -> dict:
                                  if line.strip() and not line.strip().startswith("#")),
                 })
 
+    effective_backend = os.environ.get("WHISPER_BACKEND", "auto")
+    status_val = "ready" if (local["local_backend"] != "none" or configured) else "no_backend"
+
     return {
-        "status": "ready" if configured else "no_api_key",
+        "status": status_val,
+        "backend_config": effective_backend,
+        "local_backend": local["local_backend"],
+        "local_model": local["local_model"],
+        "local_model_cached": local["local_model_cached"],
+        "cached_models": local["cached_models"],
         "api_key_configured": configured,
         "api_key_preview": f"{api_key[:8]}..." if configured else None,
+        "environment": "docker" if local["is_docker"] else "local",
         "vocabularies": vocabs,
         "vocab_dirs": [str(d) for d in get_vocab_dirs()],
-        "version": "2.0.0",
+        "version": "3.0.0",
     }
 
 
@@ -76,10 +87,16 @@ async def whisper_transcribe(
     vocabulary_prompt: str = "",
     language: str = "ja",
     output_formats: str = "txt,srt,vtt,json",
+    backend: str = "auto",
 ) -> dict:
     """音声ファイルを文字起こし（後処理辞書による自動修正付き）。
+
     output_dir 未指定時は audio_path の transcripts/ に保存。
     vocabulary_path で語彙辞書を指定すると固有名詞認識が向上。
+
+    backend: "auto" (default) — Mac はローカル優先・Docker は API
+             "local"          — ローカルモデルのみ（25MB制限なし）
+             "api"            — OpenAI API のみ
     """
     return lib_transcribe(
         audio_path=audio_path,
@@ -88,6 +105,7 @@ async def whisper_transcribe(
         vocabulary_prompt=vocabulary_prompt,
         language=language,
         output_formats=output_formats,
+        backend=backend,
     )
 
 

@@ -1,6 +1,6 @@
 """Whisper transcription library — Single Source of Truth."""
 
-from .core import transcribe, batch, process_voice_memos
+from .core import transcribe, batch, process_voice_memos, get_local_status
 from .vocabulary import load_vocabulary, vocabulary_list, vocabulary_add, get_vocab_dirs
 from .dictionary import (
     load_dictionaries, apply_dictionary, apply_dictionary_to_result,
@@ -9,7 +9,7 @@ from .dictionary import (
 from .formats import to_srt, to_vtt
 
 __all__ = [
-    "transcribe", "batch", "process_voice_memos",
+    "transcribe", "batch", "process_voice_memos", "get_local_status",
     "load_vocabulary", "vocabulary_list", "vocabulary_add", "get_vocab_dirs",
     "load_dictionaries", "apply_dictionary", "apply_dictionary_to_result",
     "dictionary_list", "dictionary_add",
