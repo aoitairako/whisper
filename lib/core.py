@@ -114,7 +114,9 @@ def _transcribe_local_cli(audio_path: Path, language: str, prompt: str) -> _Whis
             "--language", language,
             "--output_dir", tmp_dir,
             "--output_format", "json",
-            "--fp16", "False",  # Intel Mac: no FP16
+            "--fp16", "False",           # Intel Mac: no FP16
+            "--condition_on_previous_text", "False",  # suppress hallucination loops
+            "--no_speech_threshold", "0.6",           # suppress silence hallucinations
         ]
         if prompt:
             cmd += ["--initial_prompt", prompt]
