@@ -1,6 +1,6 @@
 # AGENTS.md - whisper
 
-> path: ~/Applications/whisper/
+> path: ~/src/whisper/
 > role: whisper_transcription_mcp_server
 > version: v2.0.0
 > CARE-Pattern: A (Agents / Machine interface) layer
