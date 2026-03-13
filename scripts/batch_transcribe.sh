@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # batch_transcribe.sh — 汎用バッチ文字起こしスクリプト v1.0
-# ~/Applications/whisper/ standalone app
+# ~/src/whisper/ standalone app
 #
 # 使用方法:
 #   bash batch_transcribe.sh <meetings_base_dir> [vocabulary_file]

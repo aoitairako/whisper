@@ -180,7 +180,7 @@ MCP_TOOLS = {
 VOCABULARY = {
     'format': '1行1語彙（#コメント行可）',
     'prompt_usage': 'Whisper API の prompt パラメータに渡す（カンマ区切りテキスト）',
-    'location': '~/Applications/whisper/vocabularies/ (Single Source of Truth)',
+    'location': '~/src/whisper/vocabularies/ (Single Source of Truth)',
     'files': {
         'general': 'general_vocabulary.txt — 汎用業務語彙',
         'family': 'family_vocabulary.txt — 家族名・固有名詞',

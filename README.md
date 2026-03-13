@@ -6,7 +6,7 @@ OpenAI Whisper API を MCP プロトコルで提供する standalone server。
 ## セットアップ
 
 ```bash
-cd ~/Applications/whisper
+cd ~/src/whisper
 
 # 依存パッケージのインストール
 pip3 install -r requirements.txt
@@ -48,7 +48,7 @@ python3 server.py
 ...
 ```
 
-- **汎用辞書**: `~/Applications/whisper/vocabularies/general_vocabulary.txt`
+- **汎用辞書**: `~/src/whisper/vocabularies/general_vocabulary.txt`
 - **プロジェクト固有**: 各プロジェクトの `whisper/vocabularies/` に配置
 
 ## バッチ処理スクリプト

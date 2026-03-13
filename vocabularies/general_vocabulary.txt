@@ -1,5 +1,5 @@
 # general_vocabulary.txt — 汎用業務語彙辞書
-# whisper standalone app / ~/Applications/whisper/
+# whisper standalone app / ~/src/whisper/
 # version: 1.0.0 / updated: 2026-02-21
 # 1行1語彙（#コメント行はスキップ）
 

@@ -32,13 +32,13 @@ aims: |
 ```yaml
 the_i:
   integration: "app-gateway 経由で自動マウント"
-  registry: "~/Applications/the_i/config/mcp-registry.yaml"
+  registry: "~/src/the_i/config/mcp-registry.yaml"
 
 project_vocabularies:
   pattern: "各プロジェクトの whisper/vocabularies/ にプロジェクト固有辞書を保持"
   example:
     uranairo: "~/Documents/uranairo/whisper/vocabularies/uranairo_vocabulary.txt"
-  app_vocabulary: "~/Applications/whisper/vocabularies/general_vocabulary.txt"
+  app_vocabulary: "~/src/whisper/vocabularies/general_vocabulary.txt"
 
 output_location:
   pattern: "処理元ディレクトリの transcripts/ サブディレクトリに保存"
