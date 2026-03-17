@@ -58,7 +58,7 @@ ARCHITECTURE = {
         ],
     },
     'the_i_integration': {
-        'adapter': 'the_i/tools/whisper_mcp/mcp/adapter.py',
+        'adapter': 'mcp/adapter.py',
         'strategy': 'Try import lib/ → fallback to inline',
         'env': 'WHISPER_APP_PATH for Docker path override',
         'extra_vocab_dirs': 'Passes The I vocab dir for additional dictionaries',
