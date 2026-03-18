@@ -4,3 +4,11 @@ __pycache__/
 transcripts/
 *.log
 .DS_Store
+.venv/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+*.egg-info/
+dist/
+build/
+tests/__pycache__/

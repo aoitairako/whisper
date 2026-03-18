@@ -20,20 +20,21 @@ import subprocess
 import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional
 
+from .dictionary import apply_dictionary_to_result, load_dictionaries
 from .formats import to_srt, to_vtt
 from .vocabulary import get_vocab_dirs, load_vocabulary
-from .dictionary import load_dictionaries, apply_dictionary_to_result
 
 _IS_DOCKER = os.environ.get("MCP_TRANSPORT") == "sse"
 
 
 # ── Unified result object ────────────────────────────────────────────────
 
+
 @dataclass
 class _WhisperResult:
     """Unified transcription result for both local and API backends."""
+
     text: str
     segments: list = field(default_factory=list)
     language: str = "ja"
@@ -41,11 +42,11 @@ class _WhisperResult:
 
 # ── Local backend detection ──────────────────────────────────────────────
 
-_local_backend_cache: Optional[str] = None
+_local_backend_cache: str | None = None
 _local_backend_detected: bool = False
 
 
-def _detect_local_backend() -> Optional[str]:
+def _detect_local_backend() -> str | None:
     """Detect available local Whisper backend.
 
     Priority: openai-whisper Python pkg → CLI
@@ -66,7 +67,7 @@ def _detect_local_backend() -> Optional[str]:
     return None
 
 
-def _get_local_backend() -> Optional[str]:
+def _get_local_backend() -> str | None:
     global _local_backend_cache, _local_backend_detected
     if not _local_backend_detected:
         _local_backend_cache = _detect_local_backend()
@@ -87,9 +88,11 @@ def _resolve_effective_backend(backend: str) -> str:
 
 # ── Local transcription ──────────────────────────────────────────────────
 
+
 def _transcribe_local_python(audio_path: Path, language: str, prompt: str) -> _WhisperResult:
     """Transcribe using openai-whisper Python package (in-process, no API call)."""
     import whisper as _whisper_pkg
+
     model = _whisper_pkg.load_model(_local_model())
     kwargs: dict = {"language": language, "verbose": False}
     if prompt:
@@ -109,14 +112,22 @@ def _transcribe_local_cli(audio_path: Path, language: str, prompt: str) -> _Whis
 
     with tempfile.TemporaryDirectory() as tmp_dir:
         cmd = [
-            cli, str(audio_path),
-            "--model", model,
-            "--language", language,
-            "--output_dir", tmp_dir,
-            "--output_format", "json",
-            "--fp16", "False",           # Intel Mac: no FP16
-            "--condition_on_previous_text", "False",  # suppress hallucination loops
-            "--no_speech_threshold", "0.6",           # suppress silence hallucinations
+            cli,
+            str(audio_path),
+            "--model",
+            model,
+            "--language",
+            language,
+            "--output_dir",
+            tmp_dir,
+            "--output_format",
+            "json",
+            "--fp16",
+            "False",  # Intel Mac: no FP16
+            "--condition_on_previous_text",
+            "False",  # suppress hallucination loops
+            "--no_speech_threshold",
+            "0.6",  # suppress silence hallucinations
         ]
         if prompt:
             cmd += ["--initial_prompt", prompt]
@@ -146,15 +157,16 @@ def _transcribe_local(audio_path: Path, language: str, prompt: str) -> _WhisperR
     elif lb == "cli":
         return _transcribe_local_cli(audio_path, language, prompt)
     raise RuntimeError(
-        "No local Whisper backend found. "
-        "Install openai-whisper: pip install openai-whisper"
+        "No local Whisper backend found. Install openai-whisper: pip install openai-whisper"
     )
 
 
 # ── OpenAI API transcription ─────────────────────────────────────────────
 
+
 def _get_api_client():
     import openai
+
     api_key = os.environ.get("OPENAI_API_KEY", "")
     if not api_key:
         raise ValueError("OPENAI_API_KEY not set and no local backend available")
@@ -184,6 +196,7 @@ def _transcribe_api(audio_path: Path, language: str, prompt: str) -> _WhisperRes
 
 # ── Output writing ───────────────────────────────────────────────────────
 
+
 def _write_outputs(result: _WhisperResult, stem: str, out_dir: Path, formats: list) -> dict:
     """Write transcription result to output files. Returns {format: path}."""
     output_files = {}
@@ -198,7 +211,8 @@ def _write_outputs(result: _WhisperResult, stem: str, out_dir: Path, formats: li
         p.write_text(
             json.dumps(
                 {"text": result.text, "segments": result.segments, "language": result.language},
-                ensure_ascii=False, indent=2,
+                ensure_ascii=False,
+                indent=2,
             ),
             encoding="utf-8",
         )
@@ -219,6 +233,7 @@ def _write_outputs(result: _WhisperResult, stem: str, out_dir: Path, formats: li
 
 # ── Status helper ────────────────────────────────────────────────────────
 
+
 def get_local_status() -> dict:
     """Return local backend availability info for status tools."""
     lb = _get_local_backend()
@@ -230,13 +245,18 @@ def get_local_status() -> dict:
     return {
         "local_backend": lb or "none",
         "local_model": model,
-        "local_model_cached": model in cached or f"{model}.pt" in [f.name for f in cache_dir.glob("*.pt")] if cache_dir.exists() else False,
+        "local_model_cached": (
+            model in cached or f"{model}.pt" in [f.name for f in cache_dir.glob("*.pt")]
+            if cache_dir.exists()
+            else False
+        ),
         "cached_models": cached,
         "is_docker": _IS_DOCKER,
     }
 
 
 # ── Main transcribe() ────────────────────────────────────────────────────
+
 
 def transcribe(
     audio_path: str,
@@ -323,6 +343,7 @@ def transcribe(
 
 # ── Batch / process_voice_memos ──────────────────────────────────────────
 
+
 def batch(
     meetings_base_dir: str,
     vocabulary_path: str = "",
@@ -351,11 +372,13 @@ def batch(
                         + list(meeting_dir.rglob("*.wav"))
                     )
                     if audio_files:
-                        unprocessed.append({
-                            "path": str(meeting_dir),
-                            "name": meeting_dir.name,
-                            "audio_files": [str(f) for f in audio_files],
-                        })
+                        unprocessed.append(
+                            {
+                                "path": str(meeting_dir),
+                                "name": meeting_dir.name,
+                                "audio_files": [str(f) for f in audio_files],
+                            }
+                        )
 
         if not unprocessed:
             return {"status": "success", "message": "No unprocessed meetings found", "total": 0}
@@ -398,8 +421,13 @@ def process_voice_memos(
             meetings_dir = Path(meetings_dir)
         else:
             meetings_dir = (
-                Path("/meetings") if _IS_DOCKER
-                else Path.home() / "Library" / "CloudStorage" / "SynologyDrive-tds224plus_home" / "Meetings"
+                Path("/meetings")
+                if _IS_DOCKER
+                else Path.home()
+                / "Library"
+                / "CloudStorage"
+                / "SynologyDrive-tds224plus_home"
+                / "Meetings"
             )
         if not meetings_dir.exists():
             return {

@@ -7,7 +7,10 @@ from .vocabulary import get_vocab_dirs
 
 
 def load_dictionaries(extra_dirs: list[Path] | None = None) -> list[dict]:
-    """Load all *.dict.json files from vocab dirs, merge and sort by 'from' length (longest first)."""
+    """Load all *.dict.json files from vocab dirs.
+
+    Merge and sort by 'from' length (longest first).
+    """
     replacements = []
     for vdir in get_vocab_dirs(extra_dirs):
         if not vdir.exists():
@@ -54,12 +57,14 @@ def dictionary_list(extra_dirs: list[Path] | None = None) -> dict:
             for f in sorted(vdir.glob("*.dict.json")):
                 try:
                     data = json.loads(f.read_text(encoding="utf-8"))
-                    dicts.append({
-                        "name": data.get("name", f.stem),
-                        "description": data.get("description", ""),
-                        "entries": len(data.get("replacements", [])),
-                        "path": str(f),
-                    })
+                    dicts.append(
+                        {
+                            "name": data.get("name", f.stem),
+                            "description": data.get("description", ""),
+                            "entries": len(data.get("replacements", [])),
+                            "path": str(f),
+                        }
+                    )
                 except (json.JSONDecodeError, OSError):
                     dicts.append({"name": f.stem, "path": str(f), "error": "invalid JSON"})
 

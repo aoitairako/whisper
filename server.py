@@ -20,21 +20,37 @@ if str(_app_dir) not in sys.path:
 # Load .env if present
 try:
     from dotenv import load_dotenv
+
     load_dotenv(_app_dir / ".env")
 except ImportError:
     pass
 
 from fastmcp import FastMCP
+
+from lib import (
+    batch as lib_batch,
+)
+from lib import (
+    dictionary_add as lib_dictionary_add,
+)
+from lib import (
+    dictionary_list as lib_dictionary_list,
+)
+from lib import (
+    get_local_status,
+    get_vocab_dirs,
+)
+from lib import (
+    process_voice_memos as lib_process_voice_memos,
+)
 from lib import (
     transcribe as lib_transcribe,
-    batch as lib_batch,
-    process_voice_memos as lib_process_voice_memos,
-    vocabulary_list as lib_vocabulary_list,
+)
+from lib import (
     vocabulary_add as lib_vocabulary_add,
-    dictionary_list as lib_dictionary_list,
-    dictionary_add as lib_dictionary_add,
-    get_vocab_dirs,
-    get_local_status,
+)
+from lib import (
+    vocabulary_list as lib_vocabulary_list,
 )
 
 mcp = FastMCP("whisper")
@@ -53,12 +69,17 @@ async def whisper_status() -> dict:
     for vdir in get_vocab_dirs():
         if vdir.exists():
             for f in sorted(vdir.glob("*.txt")):
-                vocabs.append({
-                    "name": f.name,
-                    "path": str(f),
-                    "lines": sum(1 for line in f.read_text(encoding="utf-8").splitlines()
-                                 if line.strip() and not line.strip().startswith("#")),
-                })
+                vocabs.append(
+                    {
+                        "name": f.name,
+                        "path": str(f),
+                        "lines": sum(
+                            1
+                            for line in f.read_text(encoding="utf-8").splitlines()
+                            if line.strip() and not line.strip().startswith("#")
+                        ),
+                    }
+                )
 
     effective_backend = os.environ.get("WHISPER_BACKEND", "auto")
     status_val = "ready" if (local["local_backend"] != "none" or configured) else "no_backend"

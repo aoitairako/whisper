@@ -3,10 +3,11 @@
 import os
 from pathlib import Path
 
-_DEFAULT_VOCAB_DIR = Path(os.environ.get(
-    "WHISPER_VOCAB_DIR",
-    str(Path(__file__).resolve().parent.parent / "vocabularies")
-))
+_DEFAULT_VOCAB_DIR = Path(
+    os.environ.get(
+        "WHISPER_VOCAB_DIR", str(Path(__file__).resolve().parent.parent / "vocabularies")
+    )
+)
 
 
 def get_vocab_dirs(extra_dirs: list[Path] | None = None) -> list[Path]:
@@ -40,13 +41,17 @@ def vocabulary_list(extra_dirs: list[Path] | None = None) -> dict:
             if vdir.exists():
                 for f in sorted(vdir.glob("*.txt")):
                     lines = f.read_text(encoding="utf-8").splitlines()
-                    terms = [l.strip() for l in lines if l.strip() and not l.strip().startswith("#")]
-                    vocabs.append({
-                        "name": f.name,
-                        "path": str(f),
-                        "term_count": len(terms),
-                        "source": str(vdir),
-                    })
+                    terms = [
+                        ln.strip() for ln in lines if ln.strip() and not ln.strip().startswith("#")
+                    ]
+                    vocabs.append(
+                        {
+                            "name": f.name,
+                            "path": str(f),
+                            "term_count": len(terms),
+                            "source": str(vdir),
+                        }
+                    )
 
         return {
             "status": "success",

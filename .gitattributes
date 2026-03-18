@@ -1,0 +1,13 @@
+* text=auto eol=lf
+*.py diff=python
+*.md diff=markdown
+*.db binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.m4a binary
+*.mp4 binary
+*.mp3 binary
+*.wav binary

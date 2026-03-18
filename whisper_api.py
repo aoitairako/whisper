@@ -9,7 +9,6 @@ New code should import from lib/ directly.
 
 import sys
 from pathlib import Path
-from typing import Optional
 
 # Ensure lib/ is importable
 _app_dir = Path(__file__).resolve().parent
@@ -24,8 +23,9 @@ from lib.vocabulary import load_vocabulary
 class WhisperClient:
     """OpenAI Whisper API client — backward-compat wrapper around lib/."""
 
-    def __init__(self, api_key: Optional[str] = None):
+    def __init__(self, api_key: str | None = None):
         import os
+
         self.api_key = api_key or os.environ.get("OPENAI_API_KEY", "")
         if not self.api_key:
             raise ValueError("OPENAI_API_KEY env var not set")
@@ -36,10 +36,10 @@ class WhisperClient:
     def transcribe(
         self,
         audio_path: str,
-        output_dir: Optional[str] = None,
-        vocabulary_path: Optional[str] = None,
+        output_dir: str | None = None,
+        vocabulary_path: str | None = None,
         language: str = "ja",
-        output_formats: Optional[list] = None,
+        output_formats: list | None = None,
     ) -> dict:
         if output_formats is None:
             output_formats = ["txt", "srt", "vtt", "json"]
@@ -60,10 +60,12 @@ class WhisperClient:
 
     def _seconds_to_srt_time(self, seconds: float) -> str:
         from lib.formats import seconds_to_srt_time
+
         return seconds_to_srt_time(seconds)
 
     def _seconds_to_vtt_time(self, seconds: float) -> str:
         from lib.formats import seconds_to_vtt_time
+
         return seconds_to_vtt_time(seconds)
 
     def _to_srt(self, segments: list) -> str:
@@ -88,11 +90,15 @@ class WhisperClient:
                 transcripts = meeting_dir / "transcripts"
                 has_transcripts = transcripts.exists() and any(transcripts.glob("*.txt"))
                 if not has_transcripts:
-                    audio_files = list(meeting_dir.rglob("*.m4a")) + list(meeting_dir.rglob("*.mp4"))
+                    audio_files = list(meeting_dir.rglob("*.m4a")) + list(
+                        meeting_dir.rglob("*.mp4")
+                    )
                     if audio_files:
-                        unprocessed.append({
-                            "path": str(meeting_dir),
-                            "name": meeting_dir.name,
-                            "audio_files": [str(f) for f in audio_files],
-                        })
+                        unprocessed.append(
+                            {
+                                "path": str(meeting_dir),
+                                "name": meeting_dir.name,
+                                "audio_files": [str(f) for f in audio_files],
+                            }
+                        )
         return unprocessed
