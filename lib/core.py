@@ -5,10 +5,12 @@ Backend strategy:
   WHISPER_BACKEND=local            — local only (error if unavailable)
   WHISPER_BACKEND=api              — OpenAI API only
   WHISPER_LOCAL_MODEL=large-v3-turbo (default, env override)
+  WHISPER_FASTER_MODEL=large-v3-turbo (faster-whisper model, env override)
 
 Local backend detection priority:
-  1. openai-whisper Python package (import whisper)
-  2. openai-whisper CLI (/usr/local/bin/whisper or PATH)
+  1. faster-whisper (CTranslate2, CPU 70x RT, recommended)
+  2. openai-whisper Python package (import whisper)
+  3. openai-whisper CLI (/usr/local/bin/whisper or PATH)
   → fallback: OpenAI API
 """
 
@@ -49,17 +51,24 @@ _local_backend_detected: bool = False
 def _detect_local_backend() -> str | None:
     """Detect available local Whisper backend.
 
-    Priority: openai-whisper Python pkg → CLI
-    Returns: "openai_whisper" | "cli" | None
+    Priority: faster-whisper → openai-whisper Python pkg → CLI
+    Returns: "faster_whisper" | "openai_whisper" | "cli" | None
     """
-    # 1. openai-whisper Python package (best: stays in-process)
+    # 1. faster-whisper (CTranslate2, CPU 70x RT, recommended)
+    try:
+        importlib.import_module("faster_whisper")
+        return "faster_whisper"
+    except ImportError:
+        pass
+
+    # 2. openai-whisper Python package (stays in-process)
     try:
         importlib.import_module("whisper")
         return "openai_whisper"
     except ImportError:
         pass
 
-    # 2. whisper CLI (Python 3.10 install at /usr/local/bin/whisper)
+    # 3. whisper CLI (Python 3.10 install at /usr/local/bin/whisper)
     cli = shutil.which("whisper") or "/usr/local/bin/whisper"
     if Path(cli).exists():
         return "cli"
@@ -79,6 +88,10 @@ def _local_model() -> str:
     return os.environ.get("WHISPER_LOCAL_MODEL", "large-v3-turbo")
 
 
+def _faster_model() -> str:
+    return os.environ.get("WHISPER_FASTER_MODEL", "large-v3-turbo")
+
+
 def _resolve_effective_backend(backend: str) -> str:
     """Return effective backend: "local_first" | "local" | "api"."""
     if backend == "auto":
@@ -87,6 +100,41 @@ def _resolve_effective_backend(backend: str) -> str:
 
 
 # ── Local transcription ──────────────────────────────────────────────────
+
+_faster_whisper_model_cache = None
+
+
+def _transcribe_faster_whisper(audio_path: Path, language: str, prompt: str) -> _WhisperResult:
+    """Transcribe using faster-whisper (CTranslate2). CPU: ~70x RT, GPU: ~200x RT."""
+    from faster_whisper import WhisperModel
+
+    global _faster_whisper_model_cache
+    if _faster_whisper_model_cache is None:
+        compute_type = "int8" if _IS_DOCKER else "auto"
+        _faster_whisper_model_cache = WhisperModel(
+            _faster_model(), device="cpu", compute_type=compute_type
+        )
+
+    kwargs: dict = {"language": language, "beam_size": 5}
+    if prompt:
+        kwargs["initial_prompt"] = prompt
+
+    segments_raw, info = _faster_whisper_model_cache.transcribe(str(audio_path), **kwargs)
+    segments_list = []
+    texts = []
+    for seg in segments_raw:
+        segments_list.append({
+            "start": seg.start,
+            "end": seg.end,
+            "text": seg.text.strip(),
+        })
+        texts.append(seg.text.strip())
+
+    return _WhisperResult(
+        text=" ".join(texts),
+        segments=segments_list,
+        language=info.language,
+    )
 
 
 def _transcribe_local_python(audio_path: Path, language: str, prompt: str) -> _WhisperResult:
@@ -152,12 +200,14 @@ def _transcribe_local_cli(audio_path: Path, language: str, prompt: str) -> _Whis
 def _transcribe_local(audio_path: Path, language: str, prompt: str) -> _WhisperResult:
     """Transcribe using the best available local backend."""
     lb = _get_local_backend()
-    if lb == "openai_whisper":
+    if lb == "faster_whisper":
+        return _transcribe_faster_whisper(audio_path, language, prompt)
+    elif lb == "openai_whisper":
         return _transcribe_local_python(audio_path, language, prompt)
     elif lb == "cli":
         return _transcribe_local_cli(audio_path, language, prompt)
     raise RuntimeError(
-        "No local Whisper backend found. Install openai-whisper: pip install openai-whisper"
+        "No local Whisper backend found. Install faster-whisper: pip install faster-whisper"
     )
 
 
@@ -237,20 +287,27 @@ def _write_outputs(result: _WhisperResult, stem: str, out_dir: Path, formats: li
 def get_local_status() -> dict:
     """Return local backend availability info for status tools."""
     lb = _get_local_backend()
-    model = _local_model()
+    model = _faster_model() if lb == "faster_whisper" else _local_model()
     cached = []
+    # Check openai-whisper cache
     cache_dir = Path.home() / ".cache" / "whisper"
     if cache_dir.exists():
         cached = [f.stem for f in sorted(cache_dir.glob("*.pt"))]
+    # Check faster-whisper cache (huggingface hub)
+    fw_cache = Path.home() / ".cache" / "huggingface" / "hub"
+    fw_cached = []
+    if fw_cache.exists():
+        fw_cached = [d.name for d in fw_cache.iterdir()
+                     if d.is_dir() and "whisper" in d.name.lower()]
     return {
         "local_backend": lb or "none",
         "local_model": model,
         "local_model_cached": (
-            model in cached or f"{model}.pt" in [f.name for f in cache_dir.glob("*.pt")]
-            if cache_dir.exists()
-            else False
+            bool(fw_cached) if lb == "faster_whisper"
+            else (model in cached or f"{model}.pt" in [f.name for f in cache_dir.glob("*.pt")]
+                  if cache_dir.exists() else False)
         ),
-        "cached_models": cached,
+        "cached_models": cached + fw_cached,
         "is_docker": _IS_DOCKER,
     }
 
