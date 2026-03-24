@@ -1,19 +1,22 @@
 # whisper — Whisper Transcription MCP Server
 
-OpenAI Whisper API を MCP プロトコルで提供する standalone server。
+ローカル faster-whisper (large-v3-turbo) を MCP プロトコルで提供する standalone server。
 会議録音・音声ファイルをテキスト化し、プロジェクト固有の語彙辞書で精度を向上させる。
+OpenAI API はフォールバックのみ — **OPENAI_API_KEY 不要でローカル動作**。
 
 ## セットアップ
 
 ```bash
 cd ~/src/whisper
 
-# 依存パッケージのインストール
+# 依存パッケージのインストール（faster-whisper を含む）
 pip3 install -r requirements.txt
 
-# 環境変数の設定
-cp .env.example .env
-# .env を編集して OPENAI_API_KEY を設定
+# ローカルモデルのダウンロード（初回のみ、自動）
+# 初回文字起こし時に large-v3-turbo が ~/.cache/huggingface/hub/ にダウンロードされる
+
+# OpenAI API フォールバックが必要な場合のみ .env を設定
+# cp .env.example .env  # OPENAI_API_KEY を設定
 ```
 
 ## 起動

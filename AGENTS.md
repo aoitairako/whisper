@@ -11,12 +11,17 @@
 WHISPER_MCP = {
     'role': 'whisper_transcription_mcp_server',
     'version': 'v2.0.0',
-    'updated': '2026-02-24',
-    'api': 'OpenAI Whisper API',
-    'model': 'whisper-1',
+    'updated': '2026-03-24',
+    'backend_primary': 'faster-whisper (local, CTranslate2)',
+    'backend_fallback': 'OpenAI Whisper API (api fallback only)',
+    'local_model': 'large-v3-turbo',
     'transport': 'stdio (FastMCP)',
-    'auth': 'OPENAI_API_KEY env',
-    'default_language': 'ja'
+    'auth': 'OPENAI_API_KEY env (fallback only — not required for local)',
+    'default_language': 'ja',
+    'backend_env': {
+        'WHISPER_BACKEND': 'auto (local_first on Mac) | local | api',
+        'WHISPER_FASTER_MODEL': 'large-v3-turbo (default)',
+    }
 }
 ```
 

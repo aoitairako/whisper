@@ -7,8 +7,8 @@
 ```yaml
 name: whisper
 identity: "Whisper transcription MCP Server — audio to text with vocabulary support"
-version: v1.1.0
-updated: 2026-02-23
+version: v1.2.0
+updated: 2026-03-24
 ```
 
 ## WHY
@@ -20,7 +20,8 @@ why: |
   文字起こし→議事録→意思決定のフローを自動化する。
 
 aims: |
-  - OpenAI Whisper API で音声ファイルをテキスト化
+  - ローカル faster-whisper (large-v3-turbo) で音声ファイルをテキスト化 (プライマリ)
+  - OpenAI Whisper API はフォールバックのみ (OPENAI_API_KEY 不要)
   - プロジェクト固有の語彙辞書で認識精度を向上
   - 複数出力形式: txt, srt, vtt, json
   - 未処理ファイルの一括処理 (batch)
