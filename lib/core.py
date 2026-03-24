@@ -361,13 +361,17 @@ def transcribe(
         if effective == "local_first":
             try:
                 result = _transcribe_local(apath, language, prompt)
-                used_backend = f"local:{_get_local_backend()}:{_local_model()}"
+                lb = _get_local_backend()
+                model = _faster_model() if lb == "faster_whisper" else _local_model()
+                used_backend = f"local:{lb}:{model}"
             except Exception as e:
                 result = _transcribe_api(apath, language, prompt)
                 used_backend = f"api (local failed: {e})"
         elif effective == "local":
             result = _transcribe_local(apath, language, prompt)
-            used_backend = f"local:{_get_local_backend()}:{_local_model()}"
+            lb = _get_local_backend()
+            model = _faster_model() if lb == "faster_whisper" else _local_model()
+            used_backend = f"local:{lb}:{model}"
         else:  # "api"
             result = _transcribe_api(apath, language, prompt)
             used_backend = "api"
